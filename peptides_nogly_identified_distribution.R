@@ -16,7 +16,7 @@ library(readxl)
 #step7: remove is.na(peptide_nogly_combine_homo_tran) and barplot
 #step8: filter: tran_num == 1 and barplot
 
-dir <- "E:\\Program Files\\R program practice\\gao_wn\\gwn_git_transmembrane\\Pancreatic_cancer_git"
+dir <- "E:\\Program Files\\R program practice\\gao_wn\\gwn_git_transmembrane\\Pancreatic_project"
 if(!dir.exists(dir))
 {
   dir.create(dir)
@@ -117,8 +117,16 @@ pdgfra_table <- as.data.frame(pdgfra_table)
 pdgfra_join <- left_join(rtk_pdffra_pos,peptide_combine_tran)
 pdgfra_join <- pdgfra_join[-nrow(pdgfra_join),]
 
-
-
+pdgfr_join_extra <- pdgfra_join[pdgfra_join$tran_location == "1_extracellular",]
+pdgfr_extra_intensity <- select(pdgfr_join_extra,matches("intensity\\."))
+pdgfr_extra_intensity[pdgfr_extra_intensity ==0] <- NA 
+pdgfr_extra_mean <- apply(pdgfr_extra_intensity,2,function(x){mean(x,na.rm = TRUE)})  
+  
+pdgfr_join_cyto <- pdgfra_join[pdgfra_join$tran_location == "5_cytoplasmic",] 
+pdgfr_cyto_intensity <- select(pdgfr_join_cyto,matches("intensity\\."))
+pdgfr_cyto_intensity[pdgfr_cyto_intensity == 0] <- NA
+pdgfr_cyto_mean <- apply(pdgfr_cyto_intensity,2,function(x){mean(x,na.rm = TRUE)})
+pdgfra_ratio <- pdgfr_extra_mean/pdgfr_cyto_mean
 
 rtk_pdffrb <- rtk_tran2[grepl("PDGFRB",rtk_tran2$Gene.names.x),]
 rtk_pdffrb_pos <- rtk_pdffrb[,c(2,5,3,4,11:13)]
@@ -131,16 +139,56 @@ rtk_egfr_pos <- rtk_egfr[,c(2,5,3,4,11:13)]
 egfr_table <- table(rtk_egfr_pos$tran_location)
 egfr_table <- as.data.frame(egfr_table)
 
+#step8_total intensity
+#join_table
+peptide_total_join <- left_join(peptide_num3,peptide_combine_tran,by = c("Leading.razor.protein","Start.position","End.position"))
 
 
+peptide_total_join2 <- select(peptide_total_join,matches("Leading.razor.protein|Gene.names|position|tran_location|intensity\\.")) 
+pep_pro_gene <- select(peptide_total_join2,matches("Leading.razor.protein|Gene.names\\.x\\.x"))
+pep_pro_gene <- pep_pro_gene[!duplicated(pep_pro_gene$Leading.razor.protein),]
 
+unique_protein <- unique(peptide_total_join2$Leading.razor.protein)
 
+#i <- unique_protein[5]
+pep_total_res <- data.frame()
+for(i in c(unique_protein))
+{
+  pep_extra <- peptide_total_join2[peptide_total_join2$tran_location == "1_extracellular" & peptide_total_join2$Leading.razor.protein %in% i,]
+  pep_cyto <-  peptide_total_join2[peptide_total_join2$tran_location == "5_cytoplasmic" & peptide_total_join2$Leading.razor.protein %in% i,]
+  
+  pep_extra_intensity <- select(pep_extra,matches("intensity\\.."))
+  if(nrow(pep_extra_intensity)!=0)
+  {pep_extra_intensity[pep_extra_intensity == 0] <- NA}
+  
+  pep_cyto_intensity <- select(pep_cyto,matches("intensity\\.."))
+  if(nrow(pep_cyto_intensity)!=0)
+  {pep_cyto_intensity[pep_cyto_intensity == 0] <- NA}
+  
+  pep_extra_mean <- apply(pep_extra_intensity,2,function(x){mean(x,na.rm = TRUE)})
 
+  pep_cyto_mean <- apply(pep_cyto_intensity,2,function(x){mean(x,na.rm = TRUE)})
 
+  pep_e_c <- pep_extra_mean/pep_cyto_mean
+  
+  pep_extra_mean <- as.data.frame(pep_extra_mean)
+  pep_extra_mean <- t( pep_extra_mean)
+  colnames(pep_extra_mean) <- gsub("Intensity","Extra_Intensity",colnames(pep_extra_mean))
+  
+  pep_cyto_mean <- as.data.frame(pep_cyto_mean)
+  pep_cyto_mean <- t(pep_cyto_mean)
+  colnames(pep_cyto_mean) <- gsub("Intensity", "Cyto_Intensity",colnames(pep_cyto_mean))
+  
+  pep_e_c <- as.data.frame(pep_e_c)
+  pep_e_c <- t(pep_e_c)
+  colnames(pep_e_c) <- gsub("Intensity\\.","ratio_",colnames(pep_e_c))
+  
+  pep_res <- data.frame(Leading.razor.protein = i, extra_num <- nrow(pep_extra), cyto_num <- nrow(pep_cyto),pep_e_c,pep_extra_mean,pep_cyto_mean,stringsAsFactors = FALSE)
+  pep_total_res <- rbind(pep_total_res,pep_res)
+}
 
-
-
-
+pep_total_res2 <- left_join(pep_total_res,pep_pro_gene,by = "Leading.razor.protein")
+write.table(pep_total_res2,file = paste(dir,"\\peptide_intensity_ratio.txt",sep = ""),sep = "\t",row.names = FALSE,quote = FALSE)
 
 
 
