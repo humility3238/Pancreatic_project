@@ -150,7 +150,7 @@ pep_pro_gene <- pep_pro_gene[!duplicated(pep_pro_gene$Leading.razor.protein),]
 
 unique_protein <- unique(peptide_total_join2$Leading.razor.protein)
 
-#i <- unique_protein[5]
+#i <- unique_protein[1]
 pep_total_res <- data.frame()
 for(i in c(unique_protein))
 {
@@ -158,10 +158,20 @@ for(i in c(unique_protein))
   pep_cyto <-  peptide_total_join2[peptide_total_join2$tran_location == "5_cytoplasmic" & peptide_total_join2$Leading.razor.protein %in% i,]
   
   pep_extra_intensity <- select(pep_extra,matches("intensity\\.."))
+  pep_extra_notzero <- apply(pep_extra_intensity,2,function(x){sum(x!=0)})
+  pep_extra_notzero <- as.data.frame(pep_extra_notzero)
+  pep_extra_notzero <- t(pep_extra_notzero)
+  colnames(pep_extra_notzero) <- gsub("Intensity\\.","extra_num_",colnames(pep_extra_notzero))
+  
   if(nrow(pep_extra_intensity)!=0)
   {pep_extra_intensity[pep_extra_intensity == 0] <- NA}
   
   pep_cyto_intensity <- select(pep_cyto,matches("intensity\\.."))
+  pep_cyto_notzero <- apply(pep_cyto_intensity,2,function(x){sum(x!=0)})
+  pep_cyto_notzero <- as.data.frame(pep_cyto_notzero)
+  pep_cyto_notzero <- t(pep_cyto_notzero)
+  colnames(pep_cyto_notzero) <- gsub("Intensity\\.","cyto_num_",colnames(pep_cyto_notzero)) 
+  
   if(nrow(pep_cyto_intensity)!=0)
   {pep_cyto_intensity[pep_cyto_intensity == 0] <- NA}
   
@@ -183,12 +193,40 @@ for(i in c(unique_protein))
   pep_e_c <- t(pep_e_c)
   colnames(pep_e_c) <- gsub("Intensity\\.","ratio_",colnames(pep_e_c))
   
-  pep_res <- data.frame(Leading.razor.protein = i, extra_num <- nrow(pep_extra), cyto_num <- nrow(pep_cyto),pep_e_c,pep_extra_mean,pep_cyto_mean,stringsAsFactors = FALSE)
+  pep_res <- data.frame(Leading.razor.protein = i, extra_num <- nrow(pep_extra), cyto_num <- nrow(pep_cyto),pep_e_c,pep_extra_notzero,pep_cyto_notzero,pep_extra_mean,pep_cyto_mean,stringsAsFactors = FALSE)
   pep_total_res <- rbind(pep_total_res,pep_res)
 }
 
 pep_total_res2 <- left_join(pep_total_res,pep_pro_gene,by = "Leading.razor.protein")
+pep_total_res2 <- pep_total_res2[pep_total_res2$extra_num....nrow.pep_extra.!=0 | pep_total_res2$cyto_num....nrow.pep_cyto.!=0,]
+
+pep_total_res3 <- pep_total_res2[,c(1,109,2,3)]
+for(i in 4:24)
+{
+  pep_total_res3 <- cbind(pep_total_res3,pep_total_res2[,c(i,i+21,i+42,i+63,i+84)])
+}
+
+
+for(i in 1:nrow(pep_total_res2))
+{
+  if(pep_total_res2$extra_num....nrow.pep_extra.[i]==0)
+  {
+    pep_total_res2[i,c(4:24)] <- "extra_not_identified"
+  }
+  else if(pep_total_res2$cyto_num....nrow.pep_cyto.[i]==0)
+  {
+    pep_total_res2[i,c(4:24)] <- "cyto_not_identified"
+  }
+  # else if(pep_total_res2$extra_num....nrow.pep_extra.[i]!=0 & pep_total_res2$cyto_num....nrow.pep_cyto.[i]!=0)
+  # {
+  #   pep_total_res2[i,c(4:24)][is.na(pep_total_res2[i,c(4:24)])] <- "not_identified"
+  # }
+}
+
+
 write.table(pep_total_res2,file = paste(dir,"\\peptide_intensity_ratio.txt",sep = ""),sep = "\t",row.names = FALSE,quote = FALSE)
+
+write.table(pep_total_res3,file = paste(dir,"\\peptide_intensity_ratio_v2.txt",sep = ""),sep = "\t",row.names = FALSE,quote = FALSE)
 
 
 
